@@ -1,11 +1,14 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.12-slim AS build
+FROM python:3.13-slim AS build
 WORKDIR /build
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-FROM python:3.12-slim
+FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# Pick up OS security fixes published after the base image was built.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 COPY --from=build /install /usr/local
 WORKDIR /srv
