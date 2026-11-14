@@ -99,13 +99,23 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-      - name: Scan image (fails on fixable HIGH/CRITICAL)
+      - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ steps.tag.outputs.tag }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          format: json
+          output: trivy.json
+
+      # Surface each finding as an annotation on the run, then gate the push.
+      - name: Fail on fixable HIGH/CRITICAL findings
+        run: |
+          findings="$(jq -r '.Results[]? | .Target as $t | .Vulnerabilities[]? |
+            "\(.Severity) \(.VulnerabilityID): \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion) (\($t))"' trivy.json | sort -u)"
+          if [ -z "$findings" ]; then echo "No fixable HIGH/CRITICAL vulnerabilities."; exit 0; fi
+          echo "$findings" | while read -r line; do echo "::error title=Image vulnerability::$line"; done
+          exit 1
 
       - name: Push (main only)
         if: github.event_name == 'push'
