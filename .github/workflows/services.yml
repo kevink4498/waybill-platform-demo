@@ -108,6 +108,11 @@ jobs:
           format: json
           output: trivy.json
 
+      - name: DEBUG locate setuptools
+        run: |
+          out="$(docker run --rm --user 0 --entrypoint sh "$IMAGE:${{ steps.tag.outputs.tag }}" -c 'find / \( -iname "setuptools-*" -o -iname "setuptools" \) -not -path "/proc/*" 2>/dev/null; pip --version; pip list 2>/dev/null | grep -i setuptools' | tr '\n' ' ')"
+          echo "::notice title=debug::$out"
+
       # Surface each finding as an annotation on the run, then gate the push.
       - name: Fail on fixable HIGH/CRITICAL findings
         run: |
