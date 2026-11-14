@@ -112,7 +112,7 @@ jobs:
       - name: Fail on fixable HIGH/CRITICAL findings
         run: |
           findings="$(jq -r '.Results[]? | .Target as $t | .Vulnerabilities[]? |
-            "\(.Severity) \(.VulnerabilityID): \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion) (\($t))"' trivy.json | sort -u)"
+            "\(.Severity) \(.VulnerabilityID): \(.PkgName) \(.InstalledVersion) -> \(.FixedVersion) (\(.PkgPath // $t))"' trivy.json | sort -u)"
           if [ -z "$findings" ]; then echo "No fixable HIGH/CRITICAL vulnerabilities."; exit 0; fi
           echo "$findings" | while read -r line; do echo "::error title=Image vulnerability::$line"; done
           exit 1
