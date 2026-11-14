@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups:
+      actions: {patterns: ["*"]}
+
+  - package-ecosystem: pip
+    directories:
+      - /services/ingest-api
+      - /services/tracker-worker
+    schedule: {interval: weekly}
+    groups:
+      python: {patterns: ["*"]}
+
+  - package-ecosystem: docker
+    directories:
+      - /services/ingest-api
+      - /services/tracker-worker
+    schedule: {interval: weekly}
+
+  - package-ecosystem: terraform
+    directories:
+      - /terraform/envs/dev
+      - /terraform/envs/staging
+      - /terraform/envs/prod
+    schedule: {interval: monthly}

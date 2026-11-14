@@ -1,5 +1,9 @@
 # waybill-platform
 
+[![services](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/services.yml/badge.svg?branch=main)](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/services.yml)
+[![platform](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/platform.yml/badge.svg?branch=main)](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/platform.yml)
+[![terraform](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/terraform.yml/badge.svg?branch=main)](https://github.com/kevink4498/waybill-platform-demo/actions/workflows/terraform.yml)
+
 A reference delivery platform for a small event-driven product on Google Cloud: two services,
 CI pipelines, a reusable Helm chart, FluxCD GitOps for three environments, and Terraform for
 the data layer. Everything is secure by default and every release is a reviewed Git change.
