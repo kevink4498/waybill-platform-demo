@@ -1,0 +1,16 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tracker-worker
+  namespace: waybill
+spec:
+  values:
+    image:
+      tag: main-0000000
+    route:
+      hostname: events.waybill.example.com
+    autoscaling:
+      minReplicas: 2
+      maxReplicas: 6
+    pdb:
+      enabled: true

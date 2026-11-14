@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
+.venv/
+.terraform/
+*.tfstate*
+*.tfplan
+.terraform.lock.hcl
+*.tgz
+.DS_Store

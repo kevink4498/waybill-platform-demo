@@ -1,0 +1,79 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+  push:
+    branches: [main]
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform fmt -check -recursive terraform
+      - name: Validate every environment (no backend, no credentials)
+        run: |
+          for env in dev staging prod; do
+            terraform -chdir="terraform/envs/$env" init -backend=false -input=false
+            terraform -chdir="terraform/envs/$env" validate
+          done
+      - uses: terraform-linters/setup-tflint@v4
+      - run: tflint --recursive --chdir terraform
+      - name: Security scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  # Plan on pull requests, apply on main. Skipped until the repository variable
+  # GCP_WORKLOAD_IDENTITY_PROVIDER is set, so a fork without cloud access still gets green CI.
+  plan-apply:
+    needs: static
+    if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1          # dev, then staging, then prod
+      matrix:
+        env: [dev, staging, prod]
+    environment: ${{ github.event_name == 'push' && matrix.env || '' }}   # prod has required reviewers
+    permissions:
+      contents: read
+      id-token: write          # keyless auth to GCP through OIDC; no stored service-account key
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: terraform/envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: terraform@waybill-${{ matrix.env }}.iam.gserviceaccount.com
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - run: terraform init -input=false
+      - name: Plan
+        run: terraform plan -input=false -lock-timeout=120s -out=tfplan
+      - name: Summarise plan
+        run: |
+          {
+            echo "### Terraform plan: ${{ matrix.env }}"
+            echo '```'
+            terraform show -no-color tfplan | tail -n 60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply
+        if: github.event_name == 'push'
+        run: terraform apply -input=false -lock-timeout=120s tfplan

@@ -1,0 +1,63 @@
+name: promote
+
+# Promotion never deploys directly. It opens a pull request that changes the image tag in
+# one environment overlay; a reviewer merges it and Flux reconciles the cluster.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to promote into
+        type: choice
+        options: [dev, staging, prod]
+        required: true
+      service:
+        description: Service to promote
+        type: choice
+        options: [all, ingest-api, tracker-worker]
+        default: all
+      tag:
+        description: "Image tag (main-<sha> or vX.Y.Z). Leave empty to copy from 'from'."
+        required: false
+      from:
+        description: Copy the tag currently running in this environment
+        type: choice
+        options: ["", dev, staging]
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update overlay
+        env:
+          TARGET: ${{ inputs.target }}
+          SERVICE: ${{ inputs.service }}
+          TAG: ${{ inputs.tag }}
+          FROM: ${{ inputs.from }}
+        run: |
+          if [ -n "$TAG" ]; then
+            scripts/promote.sh "$TARGET" "$SERVICE" "$TAG" | tee promote.log
+          elif [ -n "$FROM" ]; then
+            scripts/promote.sh "$TARGET" "$SERVICE" --from "$FROM" | tee promote.log
+          else
+            echo "Provide either a tag or a source environment" >&2; exit 1
+          fi
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET: ${{ inputs.target }}
+          SERVICE: ${{ inputs.service }}
+        run: |
+          if git diff --quiet -- gitops; then echo "Nothing to promote"; exit 0; fi
+          branch="promote/${TARGET}-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "promote(${TARGET}): ${SERVICE}"
+          git push -u origin "$branch"
+          gh pr create --title "Promote ${SERVICE} to ${TARGET}" --body "$(printf 'Requested by @%s\n\n```\n%s\n```' "$GITHUB_ACTOR" "$(cat promote.log)")"

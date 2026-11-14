@@ -1,0 +1,23 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ingest-api
+  namespace: waybill
+spec:
+  values:
+    image:
+      tag: main-0000000
+    env:
+      GCP_PROJECT_ID: waybill-staging
+      SCAN_EVENTS_TOPIC: scan-events
+    serviceAccount:
+      gcpServiceAccount: ingest-api@waybill-staging.iam.gserviceaccount.com
+    vault:
+      path: waybill/staging/ingest-api
+    route:
+      hostname: api.staging.waybill.example.com
+    autoscaling:
+      minReplicas: 1
+      maxReplicas: 3
+    pdb:
+      enabled: false

@@ -1,0 +1,79 @@
+name: platform
+
+on:
+  pull_request:
+    paths: ["charts/**", "gitops/**", "scripts/**", ".github/workflows/platform.yml"]
+  push:
+    branches: [main]
+    paths: ["charts/**", "gitops/**", ".github/workflows/platform.yml"]
+
+permissions:
+  contents: read
+
+env:
+  KUBECONFORM_VERSION: v0.6.7
+  # CRD schemas (Flux, Gateway API, Vault Secrets Operator) from the community catalog.
+  CRD_SCHEMAS: https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+
+      - name: Shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: Helm lint
+        run: helm lint charts/microservice --set image.tag=main-0000000
+
+      - name: Render chart with every optional feature on, then validate
+        run: |
+          helm template demo charts/microservice \
+            --set image.tag=main-0000000 \
+            --set env.EXAMPLE=value \
+            --set vault.enabled=true --set vault.path=waybill/dev/demo \
+            --set route.enabled=true --set route.hostname=demo.example.com \
+            --set pdb.enabled=true \
+            --set serviceAccount.gcpServiceAccount=demo@example.iam.gserviceaccount.com \
+            | kubeconform -strict -summary -schema-location default -schema-location "$CRD_SCHEMAS"
+
+      - name: Build and validate every environment overlay
+        run: |
+          for env in dev staging prod; do
+            echo "::group::$env"
+            kubectl kustomize "gitops/apps/overlays/$env" \
+              | kubeconform -strict -summary -schema-location default -schema-location "$CRD_SCHEMAS"
+            echo "::endgroup::"
+          done
+
+      - name: Every overlay must pin an immutable image tag
+        run: |
+          bad=$(grep -rhoE '^\s+tag: .*' gitops/apps/overlays | grep -vE 'tag: (main-[0-9a-f]{7,40}|v[0-9]+\.[0-9]+\.[0-9]+)$' || true)
+          if [ -n "$bad" ]; then echo "Mutable or malformed tags found:"; echo "$bad"; exit 1; fi
+
+  publish-chart:
+    needs: validate
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Package and push to the OCI registry
+        run: |
+          version="$(grep '^version:' charts/microservice/Chart.yaml | awk '{print $2}')"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if helm pull "oci://ghcr.io/${{ github.repository_owner }}/waybill/charts/microservice" --version "$version" >/dev/null 2>&1; then
+            echo "Chart $version already published; bump version in Chart.yaml to release a change." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          helm package charts/microservice
+          helm push "microservice-${version}.tgz" "oci://ghcr.io/${{ github.repository_owner }}/waybill/charts"

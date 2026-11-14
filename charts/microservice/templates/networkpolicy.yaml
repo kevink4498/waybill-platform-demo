@@ -1,0 +1,37 @@
+{{- if .Values.networkPolicy.enabled }}
+# The namespace is default-deny (see gitops/apps/base). This opens only what the service needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "microservice.name" . }}
+  labels: {{- include "microservice.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "microservice.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- range .Values.networkPolicy.ingressFromNamespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - {protocol: TCP, port: {{ .Values.containerPort }}}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    {{- if .Values.networkPolicy.egress.allowHttps }}
+    - ports:
+        - {protocol: TCP, port: 443}
+    {{- end }}
+    {{- range .Values.networkPolicy.egress.extraCidrs }}
+    - to:
+        - ipBlock: {cidr: {{ . }}}
+    {{- end }}
+{{- end }}

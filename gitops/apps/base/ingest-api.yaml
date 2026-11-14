@@ -1,0 +1,27 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ingest-api
+  namespace: waybill
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: microservice
+      version: "0.1.x"
+      sourceRef:
+        kind: HelmRepository
+        name: waybill-charts
+  install:
+    remediation: {retries: 3}
+  upgrade:
+    remediation: {retries: 3, remediateLastFailure: true}
+  rollback:
+    cleanupOnFail: true
+  values:
+    image:
+      repository: ghcr.io/kevink4498/waybill/ingest-api
+    route:
+      enabled: true
+    vault:
+      enabled: true
