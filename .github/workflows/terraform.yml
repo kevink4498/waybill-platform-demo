@@ -14,8 +14,8 @@ jobs:
   static:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.9.8"
       - run: terraform fmt -check -recursive terraform
@@ -25,7 +25,7 @@ jobs:
             terraform -chdir="terraform/envs/$env" init -backend=false -input=false
             terraform -chdir="terraform/envs/$env" validate
           done
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
       - run: tflint --recursive --chdir terraform
       - name: Security scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -55,12 +55,12 @@ jobs:
       run:
         working-directory: terraform/envs/${{ matrix.env }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: actions/checkout@v7
+      - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: terraform@waybill-${{ matrix.env }}.iam.gserviceaccount.com
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.9.8"
       - run: terraform init -input=false
