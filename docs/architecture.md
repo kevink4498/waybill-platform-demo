@@ -42,7 +42,7 @@ Everything else is identical: same chart version range, same Terraform modules.
 | Network | Namespace default-deny; per-release ingress from the gateway namespace, egress to DNS and 443 |
 | Pod hardening | Pod Security `restricted`: non-root, read-only root filesystem, all capabilities dropped, seccomp `RuntimeDefault` |
 | IAM | Roles bound on the topic and dataset, never on the project |
-| Supply chain | Pinned base image and dependencies, Trivy scan gates the push, immutable tags enforced in CI |
+| Supply chain | Pinned dependencies and actions, Dependabot updates, Trivy scan gates the push, no `pip` in the runtime image, immutable tags enforced in CI |
 
 ## Known limits
 

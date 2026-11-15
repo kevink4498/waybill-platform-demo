@@ -40,14 +40,15 @@ flowchart LR
 
 | Path | What it shows |
 | --- | --- |
-| `services/` | Two Python services with unit tests: validation and publishing (`ingest-api`), an idempotent, order-safe state machine (`tracker-worker`). Non-root multi-stage images. |
-| `.github/workflows/services.yml` | Change detection, matrix jobs per service, lint, tests with an 85% coverage gate, image build with cache, Trivy scan, immutable tags. |
+| `services/` | Two Python services with unit tests: validation and publishing (`ingest-api`), an idempotent, order-safe state machine (`tracker-worker`). Non-root multi-stage images with no package manager at runtime. |
+| `.github/workflows/services.yml` | Change detection, matrix jobs per service, lint, tests with an 85% coverage gate, image build with cache, a Trivy scan that reports each finding as a run annotation and blocks the push, immutable tags. |
 | `charts/microservice/` | One chart for every service: restricted security context, HPA, PDB, Workload Identity, Vault-synced secrets, Gateway API route, NetworkPolicy. |
 | `gitops/` | Flux `HelmRelease`s with a Kustomize base and `dev` / `staging` / `prod` overlays; default-deny namespace and a ResourceQuota. |
 | `.github/workflows/platform.yml` | `helm lint`, render and schema-validate the chart and every overlay with kubeconform, block mutable tags, publish the chart to an OCI registry. |
 | `terraform/` | Modules for a Pub/Sub topic with dead-lettering, a partitioned BigQuery landing table, and Workload Identity; one root and one state per environment. |
 | `.github/workflows/terraform.yml` | fmt, validate, tflint, Trivy config scan; plan on PR and apply on main through keyless OIDC, with an approval gate on prod. |
 | `scripts/promote.sh` + `promote.yml` | Promotion as a pull request: copy a tag from one environment to the next, refuse anything that is not immutable. |
+| `.github/dependabot.yml` | Weekly grouped updates for Actions, Python packages, base images and Terraform providers. |
 | `docs/` | Architecture notes, decision records, and the release runbook. |
 
 ## Design choices
@@ -102,9 +103,10 @@ The repository is complete but ships with placeholders, because it is not tied t
 
 ## Status
 
-CI validates everything that can be checked without a cloud account: unit tests, chart and overlay
-schemas, Terraform validation and security scans. It has not been run against a live GCP project
-from this repository.
+All three workflows pass on `main`, and the `services` workflow publishes both scanned images to
+GHCR. CI covers everything that can be checked without a cloud account: unit tests, chart and
+overlay schemas, Terraform validation and security scans. The Terraform plan/apply job and the
+Flux deployment have not been run against a live GCP project from this repository.
 
 ## License
 
